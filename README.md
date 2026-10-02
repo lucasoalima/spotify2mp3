@@ -59,8 +59,9 @@ python -m venv .venv
 Na primeira execução, o programa pedirá o `Client ID` e o `Client Secret` de um aplicativo criado no [Spotify Developer Dashboard](https://developer.spotify.com/dashboard).
 
 1. Acesse o Dashboard e crie um aplicativo.
-2. Copie o `Client ID` e o `Client Secret` nas configurações do aplicativo.
-3. Execute um comando do projeto e informe os dois valores quando forem solicitados.
+2. Em **Redirect URIs**, cadastre exatamente `http://127.0.0.1:5000/callback`.
+3. Copie o `Client ID` e o `Client Secret` nas configurações do aplicativo.
+4. Execute um comando do projeto e informe os dois valores quando forem solicitados.
 
 As credenciais são gravadas apenas em `tekore_cfg.ini` neste computador. Esse arquivo já está no `.gitignore`: não o envie ao GitHub nem o compartilhe.
 
