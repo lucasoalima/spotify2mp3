@@ -1,5 +1,4 @@
 from const import colours
-from pytube.exceptions import AgeRestrictedError
 from exceptions import SpotifyAlbumNotFound, SpotifyTrackNotFound, SpotifyPlaylistNotFound, ConfigVideoMaxLength, ConfigVideoLowViewCount, YoutubeItemNotFound
 from apis.spotify import Spotify
 from utils import resave_audio_clip_with_metadata
@@ -11,11 +10,6 @@ import string
 from apis.youtube import YouTube
 
 from pathlib import Path
-
-import ssl
-
-ssl._create_default_https_context = ssl._create_stdlib_context
-
 
 class SpotifyDownloader():
     def __init__(self, spotify: Spotify, youtube: YouTube, audio_quality=1000000, max_length=60*30, min_view_count=10000):
@@ -131,12 +125,6 @@ class SpotifyDownloader():
             except ConfigVideoLowViewCount as e:
                 
                 print(f"\n{colours.WARNING}[!] Skipped a song - The found song had less views than the minimum view count, {colours.ENDC}(use the cli to increase this).\n")
-
-                skipped_tracks.append((track, e))
-
-            except AgeRestrictedError as e:
-
-                print(f"   - {colours.FAIL}[!] Skipped a song - Age restricted video.{colours.ENDC} {e}")
 
                 skipped_tracks.append((track, e))
 

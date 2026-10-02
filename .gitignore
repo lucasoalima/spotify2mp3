@@ -7,3 +7,5 @@ assets/.DS_Store
 */__pycache__
 __pycache__
 tekore_cfg.ini
+.venv/
+.uv-cache/

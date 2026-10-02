@@ -1,76 +1,66 @@
 from exceptions import ConfigVideoLowViewCount, ConfigVideoMaxLength, YoutubeItemNotFound
-from pytube import YouTube as pytubeYouTube
-from pytube import Playlist as pytubePlaylist
-from youtube_search import YoutubeSearch
-import json
+import os
+import truststore
 
-import re
+truststore.inject_into_ssl()
+
+from yt_dlp import YoutubeDL
+from yt_dlp.utils import DownloadError
 
 
 class YouTube:
     def __init__(self):
         pass
 
-    # TODO: Make videos to search configurable via parameter
-    def search(self, search_query, max_length, min_view_count, search_count = 1):
-        youtube_results = YoutubeSearch(search_query, max_results=search_count).to_json()
+    def search(self, search_query, max_length, min_view_count, search_count=1):
+        options = {"quiet": True, "no_warnings": True, "noplaylist": True}
 
-        if len(json.loads(youtube_results)['videos']) < 1:
+        try:
+            with YoutubeDL(options) as youtube:
+                results = youtube.extract_info(
+                    f"ytsearch{search_count}:{search_query}", download=False)
+        except DownloadError as error:
+            raise YoutubeItemNotFound(
+                f"Skipped song -- Could not search YouTube: {error}") from error
+
+        videos = results.get("entries", [])
+        videos = [video for video in videos if video and video.get("webpage_url")]
+        if not videos:
             raise YoutubeItemNotFound('Skipped song -- Could not load from YouTube')
 
-        youtube_videos = json.loads(youtube_results)['videos']
-        videos_meta = []
+        chosen_video = max(videos, key=lambda video: video.get("view_count") or 0)
+        youtube_video_link = chosen_video["webpage_url"]
+        duration = chosen_video.get("duration") or 0
+        view_count = chosen_video.get("view_count") or 0
 
-        for video in youtube_videos:
-            # print(video)
-            # youtube_video_title = video['title']
-            # TODO: pass in spotify song + artist and find which one matches most
+        if duration >= max_length:
+            raise ConfigVideoMaxLength(
+                f'Length {duration}s exceeds MAX_LENGTH value of {max_length}s [{youtube_video_link}]')
 
-            # TODO: Check duration against spotify song duration to find closest
+        if view_count <= min_view_count:
+            raise ConfigVideoLowViewCount(
+                f'View count {view_count} does not meet MIN_VIEW_COUNT value of {min_view_count} [{youtube_video_link}]')
 
-            youtube_video_duration = video['duration'].split(':')
-            youtube_video_duration_seconds = int(youtube_video_duration[0]) * 60  + int(youtube_video_duration[1])
-
-            youtube_video_views = re.sub('[^0-9]','', video['views'])
-            youtube_video_viewcount_safe = int(youtube_video_views) if str(youtube_video_views).isdigit() else 0
-
-            videos_meta.append((video, youtube_video_duration_seconds, youtube_video_viewcount_safe))
-
-        sorted_videos = sorted(videos_meta, key=lambda vid: vid[2], reverse=True) # Find top N videos with the most views
-        chosen_video = sorted_videos[0]
-
-        youtube_video_link = "https://www.youtube.com" + chosen_video[0]['url_suffix']
-
-        if(chosen_video[1] >= max_length):
-            raise ConfigVideoMaxLength(f'Length {chosen_video[1]}s exceeds MAX_LENGTH value of {max_length}s [{youtube_video_link}]')
-
-        if(chosen_video[2] <= min_view_count):
-            raise ConfigVideoLowViewCount(f'View count {chosen_video[2]} does not meet MIN_VIEW_COUNT value of {min_view_count} [{youtube_video_link}]')
-    
         return youtube_video_link
-    
+
     def download(self, url, audio_bitrate):
-        youtube_video = pytubeYouTube(url)
+        quality_kbps = max(48, min(320, audio_bitrate // 1000))
+        options = {
+            "format": "bestaudio/best",
+            "noplaylist": True,
+            "nopart": True,
+            "quiet": True,
+            "no_warnings": True,
+            "outtmpl": "temp/%(id)s.%(ext)s",
+            "postprocessors": [{
+                "key": "FFmpegExtractAudio",
+                "preferredcodec": "mp3",
+                "preferredquality": str(quality_kbps),
+            }],
+        }
 
-        if youtube_video.age_restricted:
-            youtube_video.bypass_age_gate()
-        youtube_video_streams = youtube_video.streams.filter(only_audio=True)
+        with YoutubeDL(options) as youtube:
+            info = youtube.extract_info(url, download=True)
+            source_path = youtube.prepare_filename(info)
 
-        correctIndex = 0
-
-        selected_bitrate_normalised = audio_bitrate / 1000
-
-        #select the best audio quality
-        finalKbps = 0
-        correctIndex = 0
-        for i,vid in enumerate(youtube_video_streams):
-            currKbps = int(re.sub("[^0-9]", "", vid.abr))
-            if currKbps <= selected_bitrate_normalised:
-                correctIndex = i
-                finalKbps = currKbps
-
-        video_stream = youtube_video_streams[correctIndex]
-
-        yt_tmp_out = video_stream.download(output_path="./temp/")
-
-        return yt_tmp_out, finalKbps
+        return os.path.splitext(source_path)[0] + ".mp3", quality_kbps

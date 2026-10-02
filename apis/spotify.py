@@ -19,7 +19,7 @@ class Spotify:
         if authType == const.SpotifyAuthType.USER:
             token = login.get_user_token()
         elif authType == const.SpotifyAuthType.ANONYMOUS:
-            token = login.get_anon_token()
+            token = login.get_client_token()
         else:
             token = None
 

@@ -114,6 +114,10 @@ def main(authtype=None, playlist=None, song=None, album=None, private_playlist=F
         print(f"\n{colours.OKCYAN}[i] Downloading {LIKED_KEYWORD} songs requires authentication.{colours.ENDC}")
         authtype = SpotifyAuthType.USER
 
+    if not login.is_client_configured():
+        print(f"\n{colours.OKCYAN}[i] Spotify application credentials are required.{colours.ENDC}")
+        login.do_client_login()
+
     # Login if requested
     if authtype == SpotifyAuthType.USER and not login.is_user_logged_in():
         login.do_user_login()

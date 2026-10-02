@@ -7,10 +7,6 @@ import multiprocessing
 import webbrowser
 from time import sleep
 
-import requests
-import json
-from bs4 import BeautifulSoup
-
 from const import colours
 
 spotify = tk.Spotify()
@@ -62,19 +58,12 @@ def get_user_token():
 
     return cred.refresh_user_token(refreshToken)
 
-# Scrape a "clienttoken" from spotify.com. Short lived, not refreshable token.
-def get_anon_token():
-    try:
-        r = requests.request("GET", "https://open.spotify.com/")
-        r_text = (
-            BeautifulSoup(r.content, "html.parser")
-            .find("script", {"id": "session"})
-            .get_text()
-        )
-
-        return json.loads(r_text)["accessToken"]
-    except Exception as e:
-        raise ValueError(f'Could not retrieve anonymous token {e}')
+def get_client_token():
+    spotify_client_id, spotify_client_secret, spotify_return_uri = tk.config_from_file(
+        cfg_filename, return_refresh=False)
+    credentials = tk.Credentials(
+        spotify_client_id, spotify_client_secret, spotify_return_uri)
+    return credentials.request_client_token()
 
 def is_user_logged_in():
     if not does_config_exist():
@@ -98,10 +87,6 @@ def do_user_login():
 
     if not is_client_configured():
         do_client_login()
-    else:
-        retry = input(f'\n{colours.OKGREEN}Spotify access is partially configured. Would you like to continue? {colours.ENDC}y\\n: ')
-        if retry != "y":
-            do_client_login()
 
     input(f'{permission_prompt}')
 
@@ -188,8 +173,14 @@ def app_factory() -> Flask:
 
         userToken = auth.request_token(code, state)
 
-        # Store refresh token
-        new_conf = (None, None, None, userToken.refresh_token)
+        spotify_client_id, spotify_client_secret, spotify_return_uri = tk.config_from_file(
+            cfg_filename, return_refresh=False)
+        new_conf = (
+            spotify_client_id,
+            spotify_client_secret,
+            spotify_return_uri,
+            userToken.refresh_token,
+        )
         tk.config_to_file(cfg_filename, new_conf)
 
         return redirect('/complete')
